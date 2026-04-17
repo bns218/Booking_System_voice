@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bella Notte — Agent Test Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0c0a08;
+    --bg2:       #141210;
+    --bg3:       #1c1916;
+    --bg4:       #242018;
+    --surface:   #2a2520;
+    --gold:      #c9a55a;
+    --gold2:     #e8c97a;
+    --gold-dim:  #7a6235;
+    --ivory:     #f0e8d8;
+    --ivory2:    #c4b898;
+    --ivory3:    #7a6e5a;
+    --red:       #8b2635;
+    --red2:      #c43c50;
+    --green:     #2d6a4a;
+    --green2:    #4a9e72;
+    --border:    rgba(201,165,90,0.15);
+    --border2:   rgba(201,165,90,0.3);
+    --radius:    10px;
+    --serif:     'Playfair Display', Georgia, serif;
+    --sans:      'DM Sans', sans-serif;
+    --mono:      'DM Mono', monospace;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--ivory);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Layout ── */
+  .shell {
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    flex-shrink: 0;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 14px; }
+
+  .logo-mark {
+    width: 32px; height: 32px;
+    border: 1px solid var(--gold-dim);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif);
+    font-size: 13px;
+    color: var(--gold);
+  }
+
+  .site-title {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--ivory);
+    letter-spacing: 0.02em;
+  }
+
+  .site-subtitle {
+    font-size: 11px;
+    color: var(--ivory3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px;
+    color: var(--ivory3);
+    font-family: var(--mono);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--ivory3);
+    transition: background 0.3s;
+  }
+  .status-dot.connected   { background: var(--green2); box-shadow: 0 0 6px var(--green2); }
+  .status-dot.calling     { background: var(--gold); animation: pulse-dot 1s infinite; }
+  .status-dot.error       { background: var(--red2); }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* ── Panels ── */
+  .panel {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+
+  .panel-head {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 500;
+  }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface) transparent;
+  }
+
+  /* ── Config panel ── */
+  .field { margin-bottom: 18px; }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--ivory3);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--ivory);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--gold-dim);
+  }
+
+  .field textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+
+  .field select option { background: #1c1916; }
+
+  .voice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .voice-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--ivory2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+
+  .voice-btn:hover  { border-color: var(--gold-dim); color: var(--gold2); }
+  .voice-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,165,90,0.08); }
+
+  /* ── RAG docs ── */
+  .doc-drop {
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 18px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--ivory3);
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .doc-drop:hover { border-color: var(--gold-dim); color: var(--ivory2); }
+  .doc-drop .drop-icon { font-size: 22px; margin-bottom: 6px; display: block; }
+
+  .doc-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .doc-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .doc-icon { color: var(--gold-dim); font-size: 14px; flex-shrink: 0; }
+
+  .doc-name { flex: 1; color: var(--ivory2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .doc-size { color: var(--ivory3); font-family: var(--mono); font-size: 10px; }
+
+  .doc-remove {
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--ivory3);
+    border-radius: 4px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .doc-remove:hover { background: var(--red); color: var(--ivory); }
+
+  /* ── Center: Call interface ── */
+  .call-center {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 32px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .agent-avatar {
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif);
+    font-size: 30px;
+    color: var(--gold);
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .agent-ring {
+    position: absolute; inset: -8px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    animation: none;
+  }
+  .agent-ring.active {
+    border-color: var(--gold-dim);
+    animation: ring-pulse 1.8s ease-out infinite;
+  }
+
+  @keyframes ring-pulse {
+    0%   { inset: -8px; opacity: 0.8; }
+    100% { inset: -24px; opacity: 0; }
+  }
+
+  .agent-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--ivory);
+    letter-spacing: 0.01em;
+    position: relative; z-index: 1;
+  }
+
+  .agent-role {
+    font-size: 12px;
+    color: var(--ivory3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 4px;
+    margin-bottom: 32px;
+    position: relative; z-index: 1;
+  }
+
+  /* ── Waveform ── */
+  .waveform-wrap {
+    width: 280px; height: 56px;
+    position: relative; z-index: 1;
+    margin-bottom: 36px;
+  }
+
+  #waveform {
+    width: 100%; height: 100%;
+  }
+
+  .call-timer {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--ivory);
+    letter-spacing: 0.08em;
+    margin-bottom: 28px;
+    position: relative; z-index: 1;
+  }
+  .call-timer.idle { color: var(--ivory3); font-size: 20px; }
+
+  /* ── Call button ── */
+  .call-btn-wrap {
+    display: flex; gap: 16px; align-items: center;
+    position: relative; z-index: 1;
+  }
+
+  .btn-call {
+    width: 68px; height: 68px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+  .btn-call:active { transform: scale(0.95); }
+
+  .btn-call.start  { background: var(--green2); color: #fff; }
+  .btn-call.end    { background: var(--red2);   color: #fff; }
+  .btn-call:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-icon { display: flex; align-items: center; justify-content: center; }
+
+  /* phone SVG icons */
+  .icon-phone-on  { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+  .icon-phone-off { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+
+  .btn-mute {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--ivory2);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .btn-mute:hover  { border-color: var(--gold-dim); }
+  .btn-mute.muted  { background: var(--surface); color: var(--red2); border-color: var(--red); }
+
+  .call-mode-badge {
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--ivory3);
+    font-family: var(--mono);
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .badge-chip {
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .badge-chip:hover     { border-color: var(--gold-dim); color: var(--gold2); }
+  .badge-chip.sim-mode  { border-color: var(--gold-dim); color: var(--gold); background: rgba(201,165,90,0.08); }
+
+  /* ── Right: Transcript + Booking ── */
+  .right-panel { border-left: 1px solid var(--border); border-right: none; }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 13px 12px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    color: var(--ivory3);
+    cursor: pointer;
+    transition: color 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+  .tab-pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .tab-pane.active { display: flex; }
+
+  /* ── Transcript ── */
+  #transcript-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface) transparent;
+  }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    animation: msg-in 0.2s ease-out;
+  }
+
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-speaker {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .msg-speaker.agent    { color: var(--gold); }
+  .msg-speaker.customer { color: var(--ivory3); }
+
+  .msg-bubble {
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 92%;
+  }
+
+  .msg.agent .msg-bubble    { background: var(--bg3); color: var(--ivory); border: 1px solid var(--border); }
+  .msg.customer .msg-bubble { background: var(--surface); color: var(--ivory2); align-self: flex-end; }
+  .msg.customer             { align-items: flex-end; }
+
+  .transcript-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--ivory3);
+    font-size: 13px;
+    gap: 8px;
+    text-align: center;
+    padding: 40px;
+  }
+  .transcript-empty .empty-icon { font-size: 28px; opacity: 0.4; }
+
+  .transcript-footer {
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .sim-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--ivory);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    outline: none;
+  }
+  .sim-input:focus { border-color: var(--gold-dim); }
+  .sim-input::placeholder { color: var(--ivory3); }
+
+  .btn-send {
+    padding: 7px 14px;
+    background: var(--gold-dim);
+    border: none;
+    border-radius: 6px;
+    color: var(--bg);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-send:hover { background: var(--gold); }
+
+  /* ── Booking panel ── */
+  .booking-pane {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  .booking-status {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .booking-status.pending  { background: rgba(201,165,90,0.08); border: 1px solid var(--gold-dim); color: var(--gold); }
+  .booking-status.confirmed { background: rgba(74,158,114,0.12); border: 1px solid var(--green); color: var(--green2); }
+  .booking-status.none     { background: var(--bg3); border: 1px solid var(--border); color: var(--ivory3); }
+
+  .bfield {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .bfield-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ivory3);
+  }
+
+  .bfield-value {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    color: var(--ivory2);
+    font-family: var(--mono);
+    min-height: 34px;
+    transition: all 0.3s;
+  }
+  .bfield-value.filled {
+    border-color: var(--gold-dim);
+    color: var(--ivory);
+    background: rgba(201,165,90,0.05);
+  }
+
+  .bfields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn-save-booking {
+    margin-top: 8px;
+    width: 100%;
+    padding: 11px;
+    background: none;
+    border: 1px solid var(--green);
+    border-radius: var(--radius);
+    color: var(--green2);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
+  }
+  .btn-save-booking:hover:not(:disabled) { background: rgba(74,158,114,0.12); }
+  .btn-save-booking:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Simulation controls ── */
+  .sim-panel {
+    background: var(--bg3);
+    border-top: 1px solid var(--border);
+    padding: 12px 18px;
+    flex-shrink: 0;
+  }
+
+  .sim-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ivory3);
+    margin-bottom: 8px;
+  }
+
+  .sim-scripts {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+
+  .sim-script-btn {
+    padding: 4px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--ivory2);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sim-script-btn:hover { border-color: var(--gold-dim); color: var(--gold2); }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--bg3);
+    border: 1px solid var(--gold-dim);
+    color: var(--ivory);
+    font-size: 13px;
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.25s;
+    pointer-events: none;
+    z-index: 100;
+    max-width: 280px;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.success { border-color: var(--green); }
+  #toast.error   { border-color: var(--red2); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="header-left">
+      <div class="logo-mark">B</div>
+      <div>
+        <div class="site-title">Bella Notte</div>
+        <div class="site-subtitle">Agent Test Console</div>
+      </div>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot" id="conn-dot"></div>
+      <span id="conn-label">Disconnected</span>
+    </div>
+  </header>
+
+  <!-- ── Main ── -->
+  <div class="main-grid">
+
+    <!-- ══ LEFT: Config ══ -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Agent Configuration</div>
+      </div>
+      <div class="panel-body">
+
+        <div class="field">
+          <label>Restaurant Name</label>
+          <input type="text" id="cfg-name" value="Bella Notte">
+        </div>
+
+        <div class="field">
+          <label>Agent Name</label>
+          <input type="text" id="cfg-agent" value="Sofia">
+        </div>
+
+        <div class="field">
+          <label>Cuisine Type</label>
+          <input type="text" id="cfg-cuisine" value="Italian">
+        </div>
+
+        <div class="field">
+          <label>Opening Hours</label>
+          <input type="text" id="cfg-hours" value="Mon–Sun  12:00–22:00">
+        </div>
+
+        <div class="field">
+          <label>Server URL</label>
+          <input type="text" id="cfg-url" value="wss://localhost:8998/api/chat">
+        </div>
+
+        <div class="field">
+          <label>Voice</label>
+          <div class="voice-grid" id="voice-grid">
+            <!-- populated by JS -->
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Extra Persona Notes</label>
+          <textarea id="cfg-notes" rows="3" placeholder="e.g. We have live jazz on Fridays…"></textarea>
+        </div>
+
+        <div style="border-top: 1px solid var(--border); margin: 4px 0 18px; padding-top: 16px;">
+          <div class="panel-title" style="margin-bottom: 12px;">RAG Documents</div>
+
+          <div class="doc-drop" id="doc-drop" onclick="document.getElementById('doc-file').click()">
+            <span class="drop-icon">⤓</span>
+            Drop or click to upload<br>
+            <span style="color:var(--ivory3); font-size:11px;">.txt  .pdf  .docx</span>
+            <input type="file" id="doc-file" style="display:none" multiple accept=".txt,.pdf,.docx">
+          </div>
+
+          <div class="doc-list" id="doc-list"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ CENTER: Call ══ -->
+    <div class="call-center">
+      <div class="bg-grid"></div>
+
+      <div class="agent-avatar" id="avatar">
+        <div class="agent-ring" id="agent-ring"></div>
+        S
+      </div>
+
+      <div class="agent-name" id="disp-name">Sofia</div>
+      <div class="agent-role">Booking Agent · <span id="disp-restaurant">Bella Notte</span></div>
+
+      <!-- Waveform -->
+      <div class="waveform-wrap">
+        <canvas id="waveform" width="280" height="56"></canvas>
+      </div>
+
+      <!-- Timer -->
+      <div class="call-timer idle" id="call-timer">Ready</div>
+
+      <!-- Buttons -->
+      <div class="call-btn-wrap">
+        <button class="btn-mute" id="btn-mute" title="Mute" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+
+        <button class="btn-call start" id="btn-call" onclick="toggleCall()">
+          <svg class="icon-phone-on" viewBox="0 0 24 24">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.47 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 5.55 5.55l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </button>
+
+        <button class="btn-mute" id="btn-speaker" title="Speaker" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        </button>
+      </div>
+
+      <div class="call-mode-badge">
+        Mode:
+        <span class="badge-chip sim-mode" id="mode-badge" onclick="toggleMode()">Simulation</span>
+        <span style="color:var(--ivory3)">· toggle for live WebSocket</span>
+      </div>
+    </div>
+
+    <!-- ══ RIGHT: Transcript + Booking ══ -->
+    <div class="panel right-panel">
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('transcript', this)">Transcript</button>
+        <button class="tab-btn" onclick="switchTab('booking', this)">Booking Details</button>
+      </div>
+
+      <!-- Transcript tab -->
+      <div class="tab-pane active" id="tab-transcript">
+        <div id="transcript-list">
+          <div class="transcript-empty" id="transcript-empty">
+            <div class="empty-icon">☎</div>
+            <div>Start a call to see the live conversation transcript</div>
+          </div>
+        </div>
+
+        <div class="transcript-footer">
+          <input class="sim-input" id="sim-input" placeholder="Type customer message to simulate…" onkeydown="if(event.key==='Enter') sendSimMessage()">
+          <button class="btn-send" onclick="sendSimMessage()">Send</button>
+        </div>
+
+        <div class="sim-panel">
+          <div class="sim-title">Quick scripts</div>
+          <div class="sim-scripts" id="sim-scripts">
+            <!-- populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Booking tab -->
+      <div class="tab-pane" id="tab-booking">
+        <div class="booking-pane">
+
+          <div class="booking-status none" id="booking-status-bar">
+            <span>⏳</span>
+            <span id="booking-status-text">No booking in progress</span>
+          </div>
+
+          <div class="bfield">
+            <div class="bfield-label">Reference</div>
+            <div class="bfield-value" id="bf-ref">—</div>
+          </div>
+
+          <div class="bfields-grid">
+            <div class="bfield">
+              <div class="bfield-label">Customer Name</div>
+              <div class="bfield-value" id="bf-name">—</div>
+            </div>
+            <div class="bfield">
+              <div class="bfield-label">Guests</div>
+              <div class="bfield-value" id="bf-guests">—</div>
+            </div>
+          </div>
+
+          <div class="bfields-grid">
+            <div class="bfield">
+              <div class="bfield-label">Date</div>
+              <div class="bfield-value" id="bf-date">—</div>
+            </div>
+            <div class="bfield">
+              <div class="bfield-label">Time</div>
+              <div class="bfield-value" id="bf-time">—</div>
+            </div>
+          </div>
+
+          <div class="bfield">
+            <div class="bfield-label">Dietary Requirements</div>
+            <div class="bfield-value" id="bf-dietary">—</div>
+          </div>
+
+          <div class="bfield">
+            <div class="bfield-label">Contact</div>
+            <div class="bfield-value" id="bf-contact">—</div>
+          </div>
+
+          <div class="bfield">
+            <div class="bfield-label">Special Request</div>
+            <div class="bfield-value" id="bf-special">—</div>
+          </div>
+
+          <button class="btn-save-booking" id="btn-save" disabled onclick="saveBooking()">
+            Save to Database
+          </button>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const VOICES = ['NATF0','NATF1','NATF2','NATF3','NATM0','NATM1','NATM2','NATM3','VARF0','VARF1','VARF2','VARF3','VARM0','VARM1','VARM2','VARM3'];
+
+const SIM_SCRIPTS = [
+  'Hi, I'd like to make a reservation',
+  'Table for 4 this Saturday at 7pm',
+  'My name is James Chen',
+  'Do you have vegan options?',
+  'Can I get a window seat?',
+  'My email is james@example.com',
+  'What's on the tasting menu?',
+  'Can I cancel my booking?',
+];
+
+const SIM_CONVERSATION = [
+  { speaker:'agent', text:`Good evening, thank you for calling ${getRestaurantName()}. This is Sofia speaking — how may I help you today?` },
+  { speaker:'agent', text:"Wonderful! I'd be happy to arrange that. Could I start with your full name please?" },
+  { speaker:'agent', text:"Lovely. And the date and time you had in mind?" },
+  { speaker:'agent', text:"Perfect. A table for four at 7pm this Saturday. Do you have any dietary requirements or special requests I should note?" },
+  { speaker:'agent', text:"Of course, we can absolutely accommodate that. May I take a contact number or email address for the confirmation?" },
+  { speaker:'agent', text:"Excellent. Let me confirm your booking: table for four on Saturday at 7pm, one vegan guest. We'll send confirmation to that email. Your booking is confirmed — reference number BN-2847-2026. We very much look forward to seeing you!" },
+];
+
+let simStep = 0;
+let callActive = false;
+let simMode = true;
+let muted = false;
+let callSeconds = 0;
+let timerInterval = null;
+let ws = null;
+let docs = [];
+let selectedVoice = 'NATF1';
+let bookingData = {};
+let waveAnimFrame = null;
+
+function getRestaurantName() {
+  return document.getElementById('cfg-name').value || 'Bella Notte';
+}
+
+// ── Voice grid ──
+function buildVoiceGrid() {
+  const grid = document.getElementById('voice-grid');
+  grid.innerHTML = VOICES.map(v =>
+    `<button class="voice-btn${v===selectedVoice?' active':''}" onclick="selectVoice('${v}')">${v}</button>`
+  ).join('');
+}
+
+function selectVoice(v) {
+  selectedVoice = v;
+  buildVoiceGrid();
+}
+
+// ── Sim scripts ──
+function buildSimScripts() {
+  const el = document.getElementById('sim-scripts');
+  el.innerHTML = SIM_SCRIPTS.map(s =>
+    `<button class="sim-script-btn" onclick="injectScript(this)">${s}</button>`
+  ).join('');
+}
+
+function injectScript(btn) {
+  document.getElementById('sim-input').value = btn.textContent;
+  sendSimMessage();
+}
+
+// ── Docs ──
+document.getElementById('doc-file').addEventListener('change', e => {
+  Array.from(e.target.files).forEach(addDoc);
+  e.target.value = '';
+});
+
+const dropEl = document.getElementById('doc-drop');
+dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.style.borderColor = 'var(--gold)'; });
+dropEl.addEventListener('dragleave', () => { dropEl.style.borderColor = ''; });
+dropEl.addEventListener('drop', e => {
+  e.preventDefault();
+  dropEl.style.borderColor = '';
+  Array.from(e.dataTransfer.files).forEach(addDoc);
+});
+
+function addDoc(file) {
+  const allowed = ['.txt','.pdf','.docx'];
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) { showToast('Unsupported file type: ' + ext, 'error'); return; }
+  if (docs.find(d => d.name === file.name)) { showToast('Already added: ' + file.name, 'error'); return; }
+  docs.push({ name: file.name, size: file.size, file });
+  renderDocs();
+  showToast(`Added ${file.name} to RAG`, 'success');
+}
+
+function removeDoc(name) {
+  docs = docs.filter(d => d.name !== name);
+  renderDocs();
+}
+
+function renderDocs() {
+  const list = document.getElementById('doc-list');
+  if (!docs.length) { list.innerHTML = ''; return; }
+  list.innerHTML = docs.map(d => `
+    <div class="doc-item">
+      <span class="doc-icon">${d.name.endsWith('.pdf') ? '📄' : d.name.endsWith('.docx') ? '📝' : '📃'}</span>
+      <span class="doc-name">${d.name}</span>
+      <span class="doc-size">${(d.size/1024).toFixed(0)}k</span>
+      <span class="doc-remove" onclick="removeDoc('${d.name}')">✕</span>
+    </div>
+  `).join('');
+}
+
+// ── Config live update ──
+['cfg-name','cfg-agent'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateDisplayNames);
+});
+
+function updateDisplayNames() {
+  const name   = document.getElementById('cfg-name').value  || 'Bella Notte';
+  const agent  = document.getElementById('cfg-agent').value || 'Sofia';
+  document.getElementById('disp-name').textContent       = agent;
+  document.getElementById('disp-restaurant').textContent = name;
+  document.getElementById('avatar').childNodes[1].textContent = '';
+  document.getElementById('avatar').appendChild(document.createTextNode(agent[0] || 'S'));
+}
+
+// ── Mode toggle ──
+function toggleMode() {
+  simMode = !simMode;
+  const badge = document.getElementById('mode-badge');
+  badge.textContent    = simMode ? 'Simulation' : 'Live WebSocket';
+  badge.className      = 'badge-chip' + (simMode ? ' sim-mode' : '');
+  showToast(simMode ? 'Switched to simulation mode' : 'Switched to live WebSocket mode');
+}
+
+// ── Tab switch ──
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Connection status ──
+function setStatus(state, label) {
+  const dot = document.getElementById('conn-dot');
+  const lbl = document.getElementById('conn-label');
+  dot.className = 'status-dot ' + state;
+  lbl.textContent = label;
+}
+
+// ── Call control ──
+function toggleCall() {
+  if (callActive) endCall(); else startCall();
+}
+
+function startCall() {
+  callActive = true;
+  simStep = 0;
+  callSeconds = 0;
+  document.getElementById('btn-call').className = 'btn-call end';
+  document.getElementById('btn-call').innerHTML = `<svg class="icon-phone-off" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.34 1.85.574 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.47 1.61 2 2 0 0 1 5 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.28 7.57a16 16 0 0 0 2.6 3.41"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+  document.getElementById('btn-mute').disabled    = false;
+  document.getElementById('btn-speaker').disabled = false;
+  document.getElementById('call-timer').className = 'call-timer';
+  document.getElementById('agent-ring').classList.add('active');
+
+  setStatus('calling', simMode ? 'Simulation active' : 'Connecting…');
+  clearTranscript();
+  startTimer();
+  startWaveform();
+
+  if (simMode) {
+    setTimeout(() => addMessage('agent', SIM_CONVERSATION[0].text), 800);
+  } else {
+    connectWebSocket();
+  }
+}
+
+function endCall() {
+  callActive = false;
+  muted = false;
+  document.getElementById('btn-call').className = 'btn-call start';
+  document.getElementById('btn-call').innerHTML = `<svg class="icon-phone-on" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.47 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 5.55 5.55l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+  document.getElementById('btn-mute').disabled    = true;
+  document.getElementById('btn-speaker').disabled = true;
+  document.getElementById('agent-ring').classList.remove('active');
+  document.getElementById('btn-mute').classList.remove('muted');
+  document.getElementById('call-timer').className = 'call-timer idle';
+  document.getElementById('call-timer').textContent = 'Ready';
+
+  stopTimer();
+  stopWaveform();
+  setStatus('', 'Disconnected');
+
+  if (ws) { ws.close(); ws = null; }
+}
+
+// ── Timer ──
+function startTimer() {
+  timerInterval = setInterval(() => {
+    callSeconds++;
+    const m = Math.floor(callSeconds / 60).toString().padStart(2,'0');
+    const s = (callSeconds % 60).toString().padStart(2,'0');
+    document.getElementById('call-timer').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+// ── Mute ──
+document.getElementById('btn-mute').addEventListener('click', () => {
+  muted = !muted;
+  document.getElementById('btn-mute').classList.toggle('muted', muted);
+  showToast(muted ? 'Microphone muted' : 'Microphone unmuted');
+});
+
+// ── Waveform ──
+function startWaveform() {
+  const canvas = document.getElementById('waveform');
+  const ctx = canvas.getContext('2d');
+  const bars = 40;
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const barW = canvas.width / bars - 1.5;
+    const cx   = canvas.width / 2;
+    const cy   = canvas.height / 2;
+
+    for (let i = 0; i < bars; i++) {
+      const noise = callActive ? (Math.random() * 0.6 + 0.2) : 0.08;
+      const dist  = Math.abs(i - bars/2) / (bars/2);
+      const h     = noise * (1 - dist * 0.7) * (canvas.height * 0.85);
+      const x     = (i * (barW + 1.5));
+      const alpha = callActive ? (0.4 + noise * 0.6) : 0.18;
+
+      ctx.fillStyle = `rgba(201,165,90,${alpha})`;
+      ctx.beginPath();
+      ctx.roundRect(x, cy - h/2, barW, h, 2);
+      ctx.fill();
+    }
+
+    waveAnimFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function stopWaveform() {
+  cancelAnimationFrame(waveAnimFrame);
+  const canvas = document.getElementById('waveform');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ── Transcript ──
+function clearTranscript() {
+  const list = document.getElementById('transcript-list');
+  list.innerHTML = '';
+  resetBooking();
+}
+
+function addMessage(speaker, text) {
+  const list = document.getElementById('transcript-list');
+  const empty = document.getElementById('transcript-empty');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = `msg ${speaker}`;
+  div.innerHTML = `
+    <div class="msg-speaker ${speaker}">${speaker === 'agent' ? (document.getElementById('cfg-agent').value||'Sofia') : 'Customer'}</div>
+    <div class="msg-bubble">${text}</div>
+  `;
+  list.appendChild(div);
+  list.scrollTop = list.scrollHeight;
+
+  // Check for booking confirmation
+  checkConfirmation(text);
+}
+
+// ── Simulate customer message ──
+function sendSimMessage() {
+  if (!callActive) { showToast('Start a call first'); return; }
+  const input = document.getElementById('sim-input');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  addMessage('customer', text);
+  input.value = '';
+
+  // Detect booking info from customer message
+  parseCustomerMessage(text);
+
+  // Auto-reply from agent simulation
+  simStep++;
+  if (simStep < SIM_CONVERSATION.length) {
+    const reply = SIM_CONVERSATION[simStep];
+    setTimeout(() => addMessage('agent', reply.text), 900 + Math.random()*600);
+  }
+}
+
+// ── Simple booking field extraction ──
+function parseCustomerMessage(text) {
+  const lower = text.toLowerCase();
+
+  // Name detection
+  const nameMatch = text.match(/(?:name is|i'm|my name's)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
+  if (nameMatch) updateBookingField('name', nameMatch[1]);
+
+  // Guests
+  const guestMatch = text.match(/(?:table for|party of|guests?[:,]?\s*)(\d+)/i);
+  if (guestMatch) updateBookingField('guests', guestMatch[1]);
+
+  // Date
+  const dateMatch = text.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*)/i);
+  if (dateMatch) updateBookingField('date', dateMatch[1]);
+
+  // Time
+  const timeMatch = text.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})\b/i);
+  if (timeMatch) updateBookingField('time', timeMatch[1]);
+
+  // Dietary
+  if (lower.includes('vegan'))       updateBookingField('dietary', 'Vegan');
+  if (lower.includes('vegetarian'))  updateBookingField('dietary', 'Vegetarian');
+  if (lower.includes('gluten'))      updateBookingField('dietary', 'Gluten-free');
+  if (lower.includes('allerg'))      updateBookingField('dietary', text);
+
+  // Contact (email or phone)
+  const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/);
+  if (emailMatch) updateBookingField('contact', emailMatch[0]);
+
+  const phoneMatch = text.match(/(?:\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/);
+  if (phoneMatch) updateBookingField('contact', phoneMatch[0]);
+
+  // Special requests
+  const specialMatch = text.match(/(?:special|request|note|surprise|anniversary|birthday|window)[\w\s,'-]*/i);
+  if (specialMatch && specialMatch[0].length > 10) updateBookingField('special', specialMatch[0].trim());
+}
+
+function checkConfirmation(text) {
+  const phrases = ['your booking is confirmed','reservation is confirmed','reference number','you\'re all set','look forward to seeing you'];
+  const lower = text.toLowerCase();
+  if (phrases.some(p => lower.includes(p))) {
+    // Extract reference number
+    const refMatch = text.match(/BN-\d+-\d+/i) || text.match(/reference\s*(?:number)?\s*:?\s*([A-Z0-9-]+)/i);
+    if (refMatch) updateBookingField('ref', refMatch[0].replace(/reference\s*(?:number)?\s*:?\s*/i,'').trim());
+
+    // Mark confirmed
+    setBookingStatus('confirmed');
+    document.getElementById('btn-save').disabled = false;
+    showToast('Booking confirmed — ready to save', 'success');
+    switchTab('booking', document.querySelectorAll('.tab-btn')[1]);
+  }
+}
+
+function updateBookingField(field, value) {
+  const map = { ref:'bf-ref', name:'bf-name', guests:'bf-guests', date:'bf-date', time:'bf-time', dietary:'bf-dietary', contact:'bf-contact', special:'bf-special' };
+  const el = document.getElementById(map[field]);
+  if (!el || el.textContent === value) return;
+  el.textContent = value;
+  el.classList.add('filled');
+  bookingData[field] = value;
+
+  // Auto-switch to booking tab if something was filled
+  if (Object.keys(bookingData).length === 1) {
+    setBookingStatus('pending');
+  }
+}
+
+function resetBooking() {
+  bookingData = {};
+  ['bf-ref','bf-name','bf-guests','bf-date','bf-time','bf-dietary','bf-contact','bf-special'].forEach(id => {
+    const el = document.getElementById(id);
+    el.textContent = '—';
+    el.classList.remove('filled');
+  });
+  document.getElementById('btn-save').disabled = true;
+  setBookingStatus('none');
+}
+
+function setBookingStatus(state) {
+  const bar = document.getElementById('booking-status-bar');
+  const txt = document.getElementById('booking-status-text');
+  bar.className = 'booking-status ' + state;
+  if (state === 'none')      { bar.querySelector('span').textContent = '⏳'; txt.textContent = 'No booking in progress'; }
+  if (state === 'pending')   { bar.querySelector('span').textContent = '◉';  txt.textContent = 'Collecting booking details…'; }
+  if (state === 'confirmed') { bar.querySelector('span').textContent = '✓';  txt.textContent = 'Booking confirmed'; }
+}
+
+function saveBooking() {
+  console.log('Saving booking:', bookingData);
+  showToast('Booking sent to database ✓', 'success');
+  document.getElementById('btn-save').disabled = true;
+  document.getElementById('btn-save').textContent = 'Saved ✓';
+}
+
+// ── WebSocket (live mode) ──
+function connectWebSocket() {
+  const url = document.getElementById('cfg-url').value;
+  try {
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      setStatus('connected', 'Connected');
+      const initMsg = {
+        type: 'init',
+        voice: selectedVoice,
+        system_prompt: buildPersonaPrompt(),
+      };
+      ws.send(JSON.stringify(initMsg));
+    };
+
+    ws.onmessage = e => {
+      if (typeof e.data === 'string') {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.text) addMessage('agent', data.text);
+        } catch { addMessage('agent', e.data); }
+      }
+    };
+
+    ws.onerror = () => setStatus('error', 'Connection failed');
+    ws.onclose = () => { if (callActive) setStatus('error', 'Disconnected'); };
+
+  } catch(err) {
+    setStatus('error', 'Failed: ' + err.message);
+    showToast('WebSocket connection failed. Try simulation mode.', 'error');
+  }
+}
+
+function buildPersonaPrompt() {
+  const name    = document.getElementById('cfg-name').value;
+  const agent   = document.getElementById('cfg-agent').value;
+  const cuisine = document.getElementById('cfg-cuisine').value;
+  const hours   = document.getElementById('cfg-hours').value;
+  const notes   = document.getElementById('cfg-notes').value;
+  return `You are ${agent}, a warm and professional booking agent for ${name}, an upscale ${cuisine} restaurant. Hours: ${hours}. ${notes} Collect: customer name, date, time, guests, dietary needs, contact. End confirmed bookings with "your booking is confirmed" and a reference number like BN-XXXX-2026.`;
+}
+
+// ── Toast ──
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show ' + type;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.className = type; }, 2800);
+}
+
+// ── Init ──
+buildVoiceGrid();
+buildSimScripts();
+stopWaveform();
+</script>
+
+</body>
+</html>
