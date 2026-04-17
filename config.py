@@ -13,7 +13,7 @@ load_dotenv()
 
 
 # ── Anthropic ────────────────────────────────────────────────────────────────
-ANTHROPIC_API_KEY: str = os.environ["ANTHROPIC_API_KEY"]
+GOOGLE_API_KEY: str = os.environ["GOOGLE_API_KEY"]
 
 # ── PersonaPlex server ───────────────────────────────────────────────────────
 PERSONAPLEX_SERVER_URL: str = os.getenv(

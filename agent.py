@@ -1,16 +1,17 @@
 """
 agent.py
 --------
-Persona prompt builder and booking detail extractor (Claude API).
+Persona prompt builder and booking detail extractor (Gemini API).
 """
 
 import json
 import re
-from anthropic import Anthropic
+import google.generativeai as genai
 
-from config import ANTHROPIC_API_KEY, RESTAURANT, CONFIRMATION_PHRASES
+from config import GOOGLE_API_KEY, RESTAURANT, CONFIRMATION_PHRASES
 
-claude = Anthropic(api_key=ANTHROPIC_API_KEY)
+# Configure the Gemini SDK
+genai.configure(api_key=GOOGLE_API_KEY)
 
 
 # ── Persona prompt ────────────────────────────────────────────────────────────
@@ -83,37 +84,37 @@ def is_confirmation(text: str) -> bool:
 
 def extract_booking_from_transcript(transcript: str) -> dict | None:
     """
-    Use Claude to extract structured booking details from the conversation
+    Use Gemini to extract structured booking details from the conversation
     transcript after a confirmation is detected.
-    Returns a dict or None if extraction fails.
     """
-    response = claude.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=512,
-        system=(
+    # Initialize the model with the system instruction
+    model = genai.GenerativeModel(
+        model_name="gemini-3-flash",
+        system_instruction=(
             "You are a data extraction assistant. "
             "Extract booking details from a restaurant call transcript. "
             "Return ONLY a valid JSON object with these keys: "
             "reference, customer_name, date, time, guests (integer), "
             "dietary, contact, special_request. "
             "Use null for any field not mentioned. "
-            "Do not include any explanation or markdown."
-        ),
-        messages=[
-            {
-                "role": "user",
-                "content": f"Extract the confirmed booking from this transcript:\n\n{transcript}",
-            }
-        ],
+            "Do not include any explanation or markdown code blocks."
+        )
     )
 
-    raw = response.content[0].text.strip()
+    # Set generation config to ensure valid JSON format
+    generation_config = {
+        "response_mime_type": "application/json",
+    }
+
     try:
+        response = model.generate_content(
+            f"Extract the confirmed booking from this transcript:\n\n{transcript}",
+            generation_config=generation_config
+        )
+        
+        raw = response.text.strip()
         return json.loads(raw)
-    except json.JSONDecodeError:
-        clean = re.sub(r"```json|```", "", raw).strip()
-        try:
-            return json.loads(clean)
-        except Exception:
-            print(f"⚠️  Could not parse booking JSON:\n{raw}")
-            return None
+
+    except Exception as e:
+        print(f"⚠️ Could not parse booking JSON or API error: {e}")
+        return None
