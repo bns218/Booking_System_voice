@@ -1,24 +1,24 @@
 # ── Core agent ──────────────────────────────────
 moshi                        # PersonaPlex / full-duplex voice model
-websockets>=12.0             # WebSocket client for PersonaPlex server
-sounddevice>=0.4.6           # Microphone input / speaker output
+websockets             # WebSocket client for PersonaPlex server
+sounddevice         # Microphone input / speaker output
 
 # ── Web server (backend ↔ frontend) ─────────────
-fastapi>=0.110.0             # ASGI web framework with WebSocket support
-uvicorn[standard]>=0.29.0    # ASGI server to run FastAPI
+fastapi           # ASGI web framework with WebSocket support
+uvicorn[standard]    # ASGI server to run FastAPI
 
 # ── AI / LLM ────────────────────────────────────
-google-generativeai>=0.5.0   # Gemini API — booking extraction + chat
-anthropic>=0.25.0            # Claude API (optional / legacy)
+google-generativeai  # Gemini API — booking extraction + chat
+anthropic           # Claude API (optional / legacy)
 
 # ── RAG ─────────────────────────────────────────
-chromadb>=0.5.0              # Vector store (persisted, local)
-sentence-transformers>=2.7.0 # Local embedding model (all-MiniLM-L6-v2)
+chromadb              # Vector store (persisted, local)
+sentence-transformers # Local embedding model (all-MiniLM-L6-v2)
 
 # ── Document loaders ────────────────────────────
-pypdf>=4.0.0                 # Read .pdf files
-python-docx>=1.1.0           # Read .docx files
+pypdf              # Read .pdf files
+python-docx          # Read .docx files
 
 # ── Data / utils ────────────────────────────────
-numpy>=1.26.0                # Audio array processing
+numpy               # Audio array processing
 python-dotenv
