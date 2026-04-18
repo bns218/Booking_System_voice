@@ -701,7 +701,7 @@
 
         <div class="field">
           <label>Server URL</label>
-          <input type="text" id="cfg-url" value="wss://localhost:8998/api/chat">
+          <input type="text" id="cfg-url" value="ws://localhost:8000/ws/call">
         </div>
 
         <div class="field">
@@ -771,8 +771,8 @@
 
       <div class="call-mode-badge">
         Mode:
-        <span class="badge-chip sim-mode" id="mode-badge" onclick="toggleMode()">Simulation</span>
-        <span style="color:var(--ivory3)">· toggle for live WebSocket</span>
+        <span class="badge-chip" id="mode-badge" onclick="toggleMode()">Live Voice</span>
+        <span style="color:var(--ivory3)">· click to toggle text simulation</span>
       </div>
     </div>
 
@@ -871,45 +871,64 @@
 <div id="toast"></div>
 
 <script>
+// ══════════════════════════════════════════════════════════════════════════════
+// Bella Notte — Agent Test Console (Real-time Backend Connected)
+// ══════════════════════════════════════════════════════════════════════════════
+
 const VOICES = ['NATF0','NATF1','NATF2','NATF3','NATM0','NATM1','NATM2','NATM3','VARF0','VARF1','VARF2','VARF3','VARM0','VARM1','VARM2','VARM3'];
 
 const SIM_SCRIPTS = [
-  'Hi, I'd like to make a reservation',
+  "Hi, I'd like to make a reservation",
   'Table for 4 this Saturday at 7pm',
   'My name is James Chen',
   'Do you have vegan options?',
   'Can I get a window seat?',
   'My email is james@example.com',
-  'What's on the tasting menu?',
+  "What's on the tasting menu?",
   'Can I cancel my booking?',
 ];
 
-const SIM_CONVERSATION = [
-  { speaker:'agent', text:`Good evening, thank you for calling ${getRestaurantName()}. This is Sofia speaking — how may I help you today?` },
-  { speaker:'agent', text:"Wonderful! I'd be happy to arrange that. Could I start with your full name please?" },
-  { speaker:'agent', text:"Lovely. And the date and time you had in mind?" },
-  { speaker:'agent', text:"Perfect. A table for four at 7pm this Saturday. Do you have any dietary requirements or special requests I should note?" },
-  { speaker:'agent', text:"Of course, we can absolutely accommodate that. May I take a contact number or email address for the confirmation?" },
-  { speaker:'agent', text:"Excellent. Let me confirm your booking: table for four on Saturday at 7pm, one vegan guest. We'll send confirmation to that email. Your booking is confirmed — reference number BN-2847-2026. We very much look forward to seeing you!" },
-];
-
-let simStep = 0;
-let callActive = false;
-let simMode = true;
-let muted = false;
-let callSeconds = 0;
+// ── State ────────────────────────────────────────────────────────────────────
+let callActive   = false;
+let simMode      = false;   // false = Live Voice (default), true = Text Simulation
+let muted        = false;
+let callSeconds  = 0;
 let timerInterval = null;
-let ws = null;
-let docs = [];
+let ws           = null;    // WebSocket connection to backend
+let docs         = [];
 let selectedVoice = 'NATF1';
-let bookingData = {};
+let bookingData  = {};
 let waveAnimFrame = null;
+
+// ── WebAudio state ──────────────────────────────────────────────────────────
+let audioContext   = null;
+let micStream      = null;
+let micProcessor   = null;
+let playbackQueue  = [];
+let isPlaying      = false;
+const SAMPLE_RATE  = 24000;
+const CHUNK_SIZE   = 1920;  // 80ms at 24kHz
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function getServerBase() {
+  const url = document.getElementById('cfg-url').value;
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}`;
+  } catch { return 'ws://localhost:8000'; }
+}
+
+function getHttpBase() {
+  return getServerBase().replace('ws://', 'http://').replace('wss://', 'https://');
+}
 
 function getRestaurantName() {
   return document.getElementById('cfg-name').value || 'Bella Notte';
 }
 
-// ── Voice grid ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Voice grid
+// ══════════════════════════════════════════════════════════════════════════════
 function buildVoiceGrid() {
   const grid = document.getElementById('voice-grid');
   grid.innerHTML = VOICES.map(v =>
@@ -922,7 +941,9 @@ function selectVoice(v) {
   buildVoiceGrid();
 }
 
-// ── Sim scripts ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Quick scripts
+// ══════════════════════════════════════════════════════════════════════════════
 function buildSimScripts() {
   const el = document.getElementById('sim-scripts');
   el.innerHTML = SIM_SCRIPTS.map(s =>
@@ -935,7 +956,9 @@ function injectScript(btn) {
   sendSimMessage();
 }
 
-// ── Docs ──
+// ══════════════════════════════════════════════════════════════════════════════
+// RAG document uploads
+// ══════════════════════════════════════════════════════════════════════════════
 document.getElementById('doc-file').addEventListener('change', e => {
   Array.from(e.target.files).forEach(addDoc);
   e.target.value = '';
@@ -970,38 +993,49 @@ function renderDocs() {
   if (!docs.length) { list.innerHTML = ''; return; }
   list.innerHTML = docs.map(d => `
     <div class="doc-item">
-      <span class="doc-icon">${d.name.endsWith('.pdf') ? '📄' : d.name.endsWith('.docx') ? '📝' : '📃'}</span>
+      <span class="doc-icon">${d.name.endsWith('.pdf') ? '\u{1F4C4}' : d.name.endsWith('.docx') ? '\u{1F4DD}' : '\u{1F4C3}'}</span>
       <span class="doc-name">${d.name}</span>
       <span class="doc-size">${(d.size/1024).toFixed(0)}k</span>
-      <span class="doc-remove" onclick="removeDoc('${d.name}')">✕</span>
+      <span class="doc-remove" onclick="removeDoc('${d.name}')">\u2715</span>
     </div>
   `).join('');
 }
 
-// ── Config live update ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Config live update
+// ══════════════════════════════════════════════════════════════════════════════
 ['cfg-name','cfg-agent'].forEach(id => {
   document.getElementById(id).addEventListener('input', updateDisplayNames);
 });
 
 function updateDisplayNames() {
-  const name   = document.getElementById('cfg-name').value  || 'Bella Notte';
-  const agent  = document.getElementById('cfg-agent').value || 'Sofia';
+  const name  = document.getElementById('cfg-name').value  || 'Bella Notte';
+  const agent = document.getElementById('cfg-agent').value || 'Sofia';
   document.getElementById('disp-name').textContent       = agent;
   document.getElementById('disp-restaurant').textContent = name;
-  document.getElementById('avatar').childNodes[1].textContent = '';
-  document.getElementById('avatar').appendChild(document.createTextNode(agent[0] || 'S'));
+  const avatar = document.getElementById('avatar');
+  // Update avatar letter
+  const textNodes = [...avatar.childNodes].filter(n => n.nodeType === 3);
+  textNodes.forEach(n => n.remove());
+  avatar.appendChild(document.createTextNode(agent[0] || 'S'));
 }
 
-// ── Mode toggle ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Mode toggle: Live Voice ↔ Text Simulation
+// ══════════════════════════════════════════════════════════════════════════════
 function toggleMode() {
   simMode = !simMode;
   const badge = document.getElementById('mode-badge');
-  badge.textContent    = simMode ? 'Simulation' : 'Live WebSocket';
-  badge.className      = 'badge-chip' + (simMode ? ' sim-mode' : '');
-  showToast(simMode ? 'Switched to simulation mode' : 'Switched to live WebSocket mode');
+  badge.textContent = simMode ? 'Text Simulation' : 'Live Voice';
+  badge.className   = 'badge-chip' + (simMode ? ' sim-mode' : '');
+  showToast(simMode
+    ? 'Switched to text simulation (Gemini chat via backend)'
+    : 'Switched to live voice (PersonaPlex via backend)');
 }
 
-// ── Tab switch ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Tab switch
+// ══════════════════════════════════════════════════════════════════════════════
 function switchTab(id, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1009,7 +1043,9 @@ function switchTab(id, btn) {
   btn.classList.add('active');
 }
 
-// ── Connection status ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Connection status
+// ══════════════════════════════════════════════════════════════════════════════
 function setStatus(state, label) {
   const dot = document.getElementById('conn-dot');
   const lbl = document.getElementById('conn-label');
@@ -1017,15 +1053,18 @@ function setStatus(state, label) {
   lbl.textContent = label;
 }
 
-// ── Call control ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Call control
+// ══════════════════════════════════════════════════════════════════════════════
 function toggleCall() {
   if (callActive) endCall(); else startCall();
 }
 
-function startCall() {
+async function startCall() {
   callActive = true;
-  simStep = 0;
   callSeconds = 0;
+  bookingData = {};
+
   document.getElementById('btn-call').className = 'btn-call end';
   document.getElementById('btn-call').innerHTML = `<svg class="icon-phone-off" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.34 1.85.574 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.47 1.61 2 2 0 0 1 5 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.28 7.57a16 16 0 0 0 2.6 3.41"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
   document.getElementById('btn-mute').disabled    = false;
@@ -1033,21 +1072,35 @@ function startCall() {
   document.getElementById('call-timer').className = 'call-timer';
   document.getElementById('agent-ring').classList.add('active');
 
-  setStatus('calling', simMode ? 'Simulation active' : 'Connecting…');
+  setStatus('calling', 'Connecting to server\u2026');
   clearTranscript();
   startTimer();
   startWaveform();
 
   if (simMode) {
-    setTimeout(() => addMessage('agent', SIM_CONVERSATION[0].text), 800);
+    // Text simulation via backend /ws/simulate
+    connectSimulationWS();
   } else {
-    connectWebSocket();
+    // Full voice pipeline via backend /ws/call
+    await connectVoiceWS();
   }
 }
 
 function endCall() {
   callActive = false;
   muted = false;
+
+  // Send end signal
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'end' }));
+  }
+
+  // Close WebSocket
+  if (ws) { ws.close(); ws = null; }
+
+  // Stop microphone
+  stopMicrophone();
+
   document.getElementById('btn-call').className = 'btn-call start';
   document.getElementById('btn-call').innerHTML = `<svg class="icon-phone-on" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.47 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 5.55 5.55l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
   document.getElementById('btn-mute').disabled    = true;
@@ -1060,11 +1113,11 @@ function endCall() {
   stopTimer();
   stopWaveform();
   setStatus('', 'Disconnected');
-
-  if (ws) { ws.close(); ws = null; }
 }
 
-// ── Timer ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Timer
+// ══════════════════════════════════════════════════════════════════════════════
 function startTimer() {
   timerInterval = setInterval(() => {
     callSeconds++;
@@ -1079,14 +1132,18 @@ function stopTimer() {
   timerInterval = null;
 }
 
-// ── Mute ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Mute
+// ══════════════════════════════════════════════════════════════════════════════
 document.getElementById('btn-mute').addEventListener('click', () => {
   muted = !muted;
   document.getElementById('btn-mute').classList.toggle('muted', muted);
   showToast(muted ? 'Microphone muted' : 'Microphone unmuted');
 });
 
-// ── Waveform ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Waveform visualiser
+// ══════════════════════════════════════════════════════════════════════════════
 function startWaveform() {
   const canvas = document.getElementById('waveform');
   const ctx = canvas.getContext('2d');
@@ -1095,7 +1152,6 @@ function startWaveform() {
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const barW = canvas.width / bars - 1.5;
-    const cx   = canvas.width / 2;
     const cy   = canvas.height / 2;
 
     for (let i = 0; i < bars; i++) {
@@ -1110,7 +1166,6 @@ function startWaveform() {
       ctx.roundRect(x, cy - h/2, barW, h, 2);
       ctx.fill();
     }
-
     waveAnimFrame = requestAnimationFrame(draw);
   }
   draw();
@@ -1123,10 +1178,12 @@ function stopWaveform() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// ── Transcript ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Transcript
+// ══════════════════════════════════════════════════════════════════════════════
 function clearTranscript() {
   const list = document.getElementById('transcript-list');
-  list.innerHTML = '';
+  list.innerHTML = '<div class="transcript-empty" id="transcript-empty"><div class="empty-icon">\u260E</div><div>Connecting to server\u2026</div></div>';
   resetBooking();
 }
 
@@ -1139,16 +1196,25 @@ function addMessage(speaker, text) {
   div.className = `msg ${speaker}`;
   div.innerHTML = `
     <div class="msg-speaker ${speaker}">${speaker === 'agent' ? (document.getElementById('cfg-agent').value||'Sofia') : 'Customer'}</div>
-    <div class="msg-bubble">${text}</div>
+    <div class="msg-bubble">${escapeHtml(text)}</div>
   `;
   list.appendChild(div);
   list.scrollTop = list.scrollHeight;
 
-  // Check for booking confirmation
+  // Client-side booking field extraction (for both modes)
+  if (speaker === 'customer') parseCustomerMessage(text);
   checkConfirmation(text);
 }
 
-// ── Simulate customer message ──
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Send message (works in both modes)
+// ══════════════════════════════════════════════════════════════════════════════
 function sendSimMessage() {
   if (!callActive) { showToast('Start a call first'); return; }
   const input = document.getElementById('sim-input');
@@ -1158,67 +1224,58 @@ function sendSimMessage() {
   addMessage('customer', text);
   input.value = '';
 
-  // Detect booking info from customer message
-  parseCustomerMessage(text);
-
-  // Auto-reply from agent simulation
-  simStep++;
-  if (simStep < SIM_CONVERSATION.length) {
-    const reply = SIM_CONVERSATION[simStep];
-    setTimeout(() => addMessage('agent', reply.text), 900 + Math.random()*600);
+  // Send to backend
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    if (simMode) {
+      ws.send(JSON.stringify({ type: 'message', text }));
+    } else {
+      ws.send(JSON.stringify({ type: 'customer_text', text }));
+    }
   }
 }
 
-// ── Simple booking field extraction ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Client-side booking field extraction (fallback/augmentation)
+// ══════════════════════════════════════════════════════════════════════════════
 function parseCustomerMessage(text) {
   const lower = text.toLowerCase();
 
-  // Name detection
   const nameMatch = text.match(/(?:name is|i'm|my name's)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
   if (nameMatch) updateBookingField('name', nameMatch[1]);
 
-  // Guests
   const guestMatch = text.match(/(?:table for|party of|guests?[:,]?\s*)(\d+)/i);
   if (guestMatch) updateBookingField('guests', guestMatch[1]);
 
-  // Date
   const dateMatch = text.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*)/i);
   if (dateMatch) updateBookingField('date', dateMatch[1]);
 
-  // Time
   const timeMatch = text.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})\b/i);
   if (timeMatch) updateBookingField('time', timeMatch[1]);
 
-  // Dietary
   if (lower.includes('vegan'))       updateBookingField('dietary', 'Vegan');
   if (lower.includes('vegetarian'))  updateBookingField('dietary', 'Vegetarian');
   if (lower.includes('gluten'))      updateBookingField('dietary', 'Gluten-free');
-  if (lower.includes('allerg'))      updateBookingField('dietary', text);
 
-  // Contact (email or phone)
   const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/);
   if (emailMatch) updateBookingField('contact', emailMatch[0]);
 
   const phoneMatch = text.match(/(?:\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/);
   if (phoneMatch) updateBookingField('contact', phoneMatch[0]);
 
-  // Special requests
   const specialMatch = text.match(/(?:special|request|note|surprise|anniversary|birthday|window)[\w\s,'-]*/i);
   if (specialMatch && specialMatch[0].length > 10) updateBookingField('special', specialMatch[0].trim());
 }
 
 function checkConfirmation(text) {
-  const phrases = ['your booking is confirmed','reservation is confirmed','reference number','you\'re all set','look forward to seeing you'];
+  const phrases = ['your booking is confirmed','reservation is confirmed','reference number',"you're all set",'look forward to seeing you'];
   const lower = text.toLowerCase();
   if (phrases.some(p => lower.includes(p))) {
-    // Extract reference number
     const refMatch = text.match(/BN-\d+-\d+/i) || text.match(/reference\s*(?:number)?\s*:?\s*([A-Z0-9-]+)/i);
     if (refMatch) updateBookingField('ref', refMatch[0].replace(/reference\s*(?:number)?\s*:?\s*/i,'').trim());
 
-    // Mark confirmed
     setBookingStatus('confirmed');
     document.getElementById('btn-save').disabled = false;
-    showToast('Booking confirmed — ready to save', 'success');
+    showToast('Booking confirmed \u2014 ready to save', 'success');
     switchTab('booking', document.querySelectorAll('.tab-btn')[1]);
   }
 }
@@ -1231,7 +1288,6 @@ function updateBookingField(field, value) {
   el.classList.add('filled');
   bookingData[field] = value;
 
-  // Auto-switch to booking tab if something was filled
   if (Object.keys(bookingData).length === 1) {
     setBookingStatus('pending');
   }
@@ -1241,10 +1297,11 @@ function resetBooking() {
   bookingData = {};
   ['bf-ref','bf-name','bf-guests','bf-date','bf-time','bf-dietary','bf-contact','bf-special'].forEach(id => {
     const el = document.getElementById(id);
-    el.textContent = '—';
+    el.textContent = '\u2014';
     el.classList.remove('filled');
   });
   document.getElementById('btn-save').disabled = true;
+  document.getElementById('btn-save').textContent = 'Save to Database';
   setBookingStatus('none');
 }
 
@@ -1252,62 +1309,301 @@ function setBookingStatus(state) {
   const bar = document.getElementById('booking-status-bar');
   const txt = document.getElementById('booking-status-text');
   bar.className = 'booking-status ' + state;
-  if (state === 'none')      { bar.querySelector('span').textContent = '⏳'; txt.textContent = 'No booking in progress'; }
-  if (state === 'pending')   { bar.querySelector('span').textContent = '◉';  txt.textContent = 'Collecting booking details…'; }
-  if (state === 'confirmed') { bar.querySelector('span').textContent = '✓';  txt.textContent = 'Booking confirmed'; }
+  if (state === 'none')      { bar.querySelector('span').textContent = '\u23F3'; txt.textContent = 'No booking in progress'; }
+  if (state === 'pending')   { bar.querySelector('span').textContent = '\u25C9'; txt.textContent = 'Collecting booking details\u2026'; }
+  if (state === 'confirmed') { bar.querySelector('span').textContent = '\u2713'; txt.textContent = 'Booking confirmed'; }
 }
 
-function saveBooking() {
-  console.log('Saving booking:', bookingData);
-  showToast('Booking sent to database ✓', 'success');
-  document.getElementById('btn-save').disabled = true;
-  document.getElementById('btn-save').textContent = 'Saved ✓';
+// ══════════════════════════════════════════════════════════════════════════════
+// Save booking to backend database
+// ══════════════════════════════════════════════════════════════════════════════
+async function saveBooking() {
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = 'Saving\u2026';
+
+  const payload = {
+    reference:       bookingData.ref || null,
+    customer_name:   bookingData.name || null,
+    date:            bookingData.date || null,
+    time:            bookingData.time || null,
+    guests:          bookingData.guests ? parseInt(bookingData.guests) : null,
+    dietary:         bookingData.dietary || null,
+    contact:         bookingData.contact || null,
+    special_request: bookingData.special || null,
+  };
+
+  try {
+    const res = await fetch(`${getHttpBase()}/api/bookings/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      btn.textContent = 'Saved \u2713';
+      showToast('Booking saved to database', 'success');
+    } else {
+      const err = await res.json();
+      btn.textContent = 'Save Failed';
+      btn.disabled = false;
+      showToast('Save failed: ' + (err.error || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    btn.textContent = 'Save Failed';
+    btn.disabled = false;
+    showToast('Network error \u2014 is the server running?', 'error');
+  }
 }
 
-// ── WebSocket (live mode) ──
-function connectWebSocket() {
+// ══════════════════════════════════════════════════════════════════════════════
+// WebSocket: Full Voice Pipeline (browser ↔ server ↔ PersonaPlex)
+// ══════════════════════════════════════════════════════════════════════════════
+async function connectVoiceWS() {
   const url = document.getElementById('cfg-url').value;
+
+  try {
+    ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      setStatus('calling', 'Initialising voice\u2026');
+      ws.send(JSON.stringify({
+        type: 'init',
+        voice: selectedVoice,
+      }));
+    };
+
+    ws.onmessage = async (e) => {
+      if (e.data instanceof ArrayBuffer) {
+        // Binary audio from PersonaPlex via server → play in browser
+        playAudioChunk(e.data);
+      } else {
+        // JSON message from server
+        try {
+          const data = JSON.parse(e.data);
+          handleServerMessage(data);
+        } catch {
+          console.warn('Unparseable message:', e.data);
+        }
+      }
+    };
+
+    ws.onerror = () => {
+      setStatus('error', 'Connection failed');
+      showToast('Server connection failed. Is uvicorn running?', 'error');
+    };
+
+    ws.onclose = () => {
+      if (callActive) {
+        setStatus('error', 'Disconnected');
+        showToast('Connection lost', 'error');
+      }
+      stopMicrophone();
+    };
+
+  } catch (err) {
+    setStatus('error', 'Failed: ' + err.message);
+    showToast('Connection error: ' + err.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WebSocket: Text Simulation (browser ↔ server ↔ Gemini)
+// ══════════════════════════════════════════════════════════════════════════════
+function connectSimulationWS() {
+  const base = getServerBase();
+  const url = `${base}/ws/simulate`;
+
   try {
     ws = new WebSocket(url);
 
     ws.onopen = () => {
-      setStatus('connected', 'Connected');
-      const initMsg = {
-        type: 'init',
-        voice: selectedVoice,
-        system_prompt: buildPersonaPrompt(),
-      };
-      ws.send(JSON.stringify(initMsg));
+      setStatus('connected', 'Simulation active');
+      showToast('Connected \u2014 text simulation via Gemini', 'success');
     };
 
-    ws.onmessage = e => {
-      if (typeof e.data === 'string') {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.text) addMessage('agent', data.text);
-        } catch { addMessage('agent', e.data); }
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        handleServerMessage(data);
+      } catch {
+        console.warn('Unparseable message:', e.data);
       }
     };
 
-    ws.onerror = () => setStatus('error', 'Connection failed');
-    ws.onclose = () => { if (callActive) setStatus('error', 'Disconnected'); };
+    ws.onerror = () => {
+      setStatus('error', 'Simulation failed');
+      showToast('Server connection failed. Is uvicorn running?', 'error');
+    };
 
-  } catch(err) {
-    setStatus('error', 'Failed: ' + err.message);
-    showToast('WebSocket connection failed. Try simulation mode.', 'error');
+    ws.onclose = () => {
+      if (callActive) setStatus('error', 'Disconnected');
+    };
+
+  } catch (err) {
+    setStatus('error', err.message);
   }
 }
 
-function buildPersonaPrompt() {
-  const name    = document.getElementById('cfg-name').value;
-  const agent   = document.getElementById('cfg-agent').value;
-  const cuisine = document.getElementById('cfg-cuisine').value;
-  const hours   = document.getElementById('cfg-hours').value;
-  const notes   = document.getElementById('cfg-notes').value;
-  return `You are ${agent}, a warm and professional booking agent for ${name}, an upscale ${cuisine} restaurant. Hours: ${hours}. ${notes} Collect: customer name, date, time, guests, dietary needs, contact. End confirmed bookings with "your booking is confirmed" and a reference number like BN-XXXX-2026.`;
+// ══════════════════════════════════════════════════════════════════════════════
+// Handle JSON messages from server (both modes)
+// ══════════════════════════════════════════════════════════════════════════════
+function handleServerMessage(data) {
+  switch (data.type) {
+    case 'status':
+      if (data.state === 'connected') {
+        setStatus('connected', data.message || 'Connected');
+        showToast(data.message || 'Connected to server', 'success');
+        // Start microphone for voice mode
+        if (!simMode) startMicrophone();
+      } else if (data.state === 'error') {
+        setStatus('error', data.message || 'Error');
+        showToast(data.message || 'Server error', 'error');
+      }
+      break;
+
+    case 'transcript':
+      addMessage(data.speaker || 'agent', data.text);
+      break;
+
+    case 'booking_update':
+      handleBookingUpdate(data);
+      break;
+
+    case 'error':
+      showToast(data.message || 'Server error', 'error');
+      break;
+
+    default:
+      console.log('Unknown message type:', data);
+  }
 }
 
-// ── Toast ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Handle booking updates from server (Gemini extraction)
+// ══════════════════════════════════════════════════════════════════════════════
+function handleBookingUpdate(data) {
+  if (data.status === 'confirmed' && data.data) {
+    const b = data.data;
+    if (b.reference)       updateBookingField('ref', b.reference);
+    if (b.customer_name)   updateBookingField('name', b.customer_name);
+    if (b.date)            updateBookingField('date', b.date);
+    if (b.time)            updateBookingField('time', b.time);
+    if (b.guests)          updateBookingField('guests', String(b.guests));
+    if (b.dietary)         updateBookingField('dietary', b.dietary);
+    if (b.contact)         updateBookingField('contact', b.contact);
+    if (b.special_request) updateBookingField('special', b.special_request);
+
+    setBookingStatus('confirmed');
+    document.getElementById('btn-save').disabled = false;
+    showToast('Backend extracted booking \u2014 ready to save', 'success');
+    switchTab('booking', document.querySelectorAll('.tab-btn')[1]);
+  } else if (data.status === 'pending') {
+    setBookingStatus('pending');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WebAudio: Microphone capture → send PCM to server
+// ══════════════════════════════════════════════════════════════════════════════
+async function startMicrophone() {
+  try {
+    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        sampleRate: SAMPLE_RATE,
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      }
+    });
+
+    const source = audioContext.createMediaStreamSource(micStream);
+
+    // ScriptProcessorNode for capturing PCM (widely supported)
+    micProcessor = audioContext.createScriptProcessor(CHUNK_SIZE, 1, 1);
+    micProcessor.onaudioprocess = (e) => {
+      if (!callActive || muted || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+      const input = e.inputBuffer.getChannelData(0);
+      // Convert float32 → int16
+      const pcm = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      ws.send(pcm.buffer);
+    };
+
+    source.connect(micProcessor);
+    micProcessor.connect(audioContext.destination);
+
+    showToast('Microphone active', 'success');
+  } catch (err) {
+    showToast('Microphone access denied: ' + err.message, 'error');
+    console.error('Mic error:', err);
+  }
+}
+
+function stopMicrophone() {
+  if (micProcessor) {
+    micProcessor.disconnect();
+    micProcessor = null;
+  }
+  if (micStream) {
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+  }
+  if (audioContext) {
+    audioContext.close().catch(() => {});
+    audioContext = null;
+  }
+  playbackQueue = [];
+  isPlaying = false;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WebAudio: Play received PCM audio from server
+// ══════════════════════════════════════════════════════════════════════════════
+function playAudioChunk(arrayBuffer) {
+  if (!audioContext) return;
+
+  // Convert int16 PCM → float32
+  const pcm16 = new Int16Array(arrayBuffer);
+  const float32 = new Float32Array(pcm16.length);
+  for (let i = 0; i < pcm16.length; i++) {
+    float32[i] = pcm16[i] / 32768.0;
+  }
+
+  // Queue and play
+  playbackQueue.push(float32);
+  if (!isPlaying) playNextChunk();
+}
+
+function playNextChunk() {
+  if (!audioContext || playbackQueue.length === 0) {
+    isPlaying = false;
+    return;
+  }
+
+  isPlaying = true;
+  const samples = playbackQueue.shift();
+
+  const buffer = audioContext.createBuffer(1, samples.length, SAMPLE_RATE);
+  buffer.getChannelData(0).set(samples);
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
+  source.onended = playNextChunk;
+  source.start();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Toast notifications
+// ══════════════════════════════════════════════════════════════════════════════
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1316,10 +1612,38 @@ function showToast(msg, type = '') {
   t._timer = setTimeout(() => { t.className = type; }, 2800);
 }
 
-// ── Init ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Server health check on load
+// ══════════════════════════════════════════════════════════════════════════════
+async function checkServerStatus() {
+  try {
+    const res = await fetch(`${getHttpBase()}/api/status`);
+    if (res.ok) {
+      const status = await res.json();
+      setStatus('connected', `Server ready \u2014 ${status.restaurant}`);
+      showToast(`Server connected: ${status.restaurant} (${status.agent})`, 'success');
+      setTimeout(() => setStatus('', 'Ready'), 3000);
+    } else {
+      setStatus('', 'Server offline');
+    }
+  } catch {
+    setStatus('', 'Server offline \u2014 start with: uvicorn server:app --port 8000');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════════════════════
 buildVoiceGrid();
 buildSimScripts();
 stopWaveform();
+
+// Default to Live Voice mode
+document.getElementById('mode-badge').textContent = 'Live Voice';
+document.getElementById('mode-badge').className   = 'badge-chip';
+
+// Check if server is running
+checkServerStatus();
 </script>
 
 </body>
