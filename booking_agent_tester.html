@@ -915,7 +915,7 @@ function getServerBase() {
   const wsProto = location.protocol === 'https:' ? 'wss://' : 'ws://';
   try {
     const u = new URL(url);
-    return `${u.protocol}//${u.host}`;
+    return `${wsProto}${u.host}`;
   } catch { return `${wsProto}34.95.12.163`; }
 }
 
