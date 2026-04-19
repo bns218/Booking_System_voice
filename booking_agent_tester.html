@@ -912,10 +912,11 @@ const CHUNK_SIZE   = 1920;  // 80ms at 24kHz
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function getServerBase() {
   const url = document.getElementById('cfg-url').value;
+  const wsProto = location.protocol === 'https:' ? 'wss://' : 'ws://';
   try {
     const u = new URL(url);
     return `${u.protocol}//${u.host}`;
-  } catch { return 'ws://34.95.12.163'; }
+  } catch { return `${wsProto}34.95.12.163`; }
 }
 
 function getHttpBase() {
