@@ -701,7 +701,7 @@
 
         <div class="field">
           <label>Server URL</label>
-          <input type="text" id="cfg-url" value="ws://localhost:8000/ws/call">
+          <input type="text" id="cfg-url" value="ws://34.95.12.163/ws/call">
         </div>
 
         <div class="field">
@@ -915,7 +915,7 @@ function getServerBase() {
   try {
     const u = new URL(url);
     return `${u.protocol}//${u.host}`;
-  } catch { return 'ws://localhost:8000'; }
+  } catch { return 'ws://34.95.12.163'; }
 }
 
 function getHttpBase() {
