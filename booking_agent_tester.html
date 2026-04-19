@@ -871,6 +871,11 @@
 <div id="toast"></div>
 
 <script>
+// Force HTTP — ws:// cannot be used from an HTTPS page
+if (location.protocol === 'https:') {
+  location.replace('http:' + location.href.slice('https:'.length));
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Bella Notte — Agent Test Console (Real-time Backend Connected)
 // ══════════════════════════════════════════════════════════════════════════════
